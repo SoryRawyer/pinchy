@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 # - mp3
 # - artwork
 # - tracklist (if available)
-LOCAL_DIR = '/Users/rorysawyer/media/audio/pinchy/'
+LOCAL_DIR = os.path.expanduser('~/media/audio/pinchy/')
 
 BASE_URL = 'http://pinchyandfriends.com'
 
@@ -44,7 +44,7 @@ def get_existing_mix_ids():
     creates directory if not already present
     """
     if not os.path.isdir(LOCAL_DIR):
-        os.mkdir(LOCAL_DIR)
+        os.makedirs(LOCAL_DIR)
         return []
 
     mix_dir = lambda x: os.path.join(LOCAL_DIR, x)
@@ -79,7 +79,7 @@ def download_file(local_name, url, overwrite=False):
     if the local file already exists, do not overwrite it unless told
     to do so
     """
-    if os.isfile(local_name) and not overwrite:
+    if os.path.isfile(local_name) and not overwrite:
         return
     resp = requests.get(url, stream=True)
     with open(local_name, 'wb') as output:
@@ -109,7 +109,7 @@ def scrape_mix_page_and_download(mix):
 
     local_mix_dir = os.path.join(LOCAL_DIR, mix.mix_id)
     if not os.path.isdir(local_mix_dir):
-        os.mkdir(local_mix_dir)
+        os.makedirs(local_mix_dir)
 
     mix_file_name = os.path.join(local_mix_dir, os.path.split(dl_link)[1])
     download_file(mix_file_name, dl_link)
