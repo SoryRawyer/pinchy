@@ -43,11 +43,12 @@ def get_existing_mix_ids():
     get_existing_mix_ids — return a list of pinchy mix ids
     creates directory if not already present
     """
-    if not os.path.isdir(LOCAL_DIR)
+    if not os.path.isdir(LOCAL_DIR):
         os.mkdir(LOCAL_DIR)
         return []
 
-    return set([mix for mix in os.listdir(LOCAL_DIR) if os.path.isdir(mix)])
+    mix_dir = lambda x: os.path.join(LOCAL_DIR, x)
+    return set([mix for mix in os.listdir(LOCAL_DIR) if os.path.isdir(mix_dir(mix))])
 
 
 def get_available_pinchy_info(content):
