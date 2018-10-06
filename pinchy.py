@@ -130,7 +130,7 @@ def main():
     main :
     - bootstrap (get a list of all downloaded mixes)
     - scrape pinchyandfriends.com and look for IDs that aren't found locally
-    - download em and exit
+    - download 'em and exit
         - if present, save the tracklist
     """
     mix_ids = get_existing_mix_ids()
