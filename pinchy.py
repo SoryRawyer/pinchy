@@ -20,6 +20,7 @@ LOCAL_DIR = os.path.expanduser('~/media/audio/pinchy/')
 
 BASE_URL = 'http://pinchyandfriends.com'
 
+
 @attr.s
 class PinchyMixMetadata:
     """
@@ -37,7 +38,8 @@ class PinchyMixMetadata:
         """
         mix_name = div['data-name2']
         artist = div['data-name1']
-        rel = div['onclick'].split('=')[1].strip().replace("'", '').replace(';', '')[1:]
+        rel = div['onclick'].split('=')[1].strip().replace("'", '').replace(
+            ';', '')[1:]
         mix_id = rel.split('/')[0]
         return PinchyMixMetadata(artist, mix_name, rel, mix_id)
 
@@ -52,8 +54,10 @@ def get_existing_mix_ids():
         return []
 
     mix_dir = lambda x: os.path.join(LOCAL_DIR, x)
-    return {mix for mix in os.listdir(LOCAL_DIR)
-            if os.path.isdir(mix_dir(mix))}
+    return {
+        mix
+        for mix in os.listdir(LOCAL_DIR) if os.path.isdir(mix_dir(mix))
+    }
 
 
 def get_available_pinchy_info(content):
@@ -79,8 +83,10 @@ def get_available_pinchy_info(content):
     """
     page = BeautifulSoup(content, features='html.parser')
     rel = page.find(id='grid_rel')
-    return [PinchyMixMetadata.from_div(child) 
-            for child in rel.children if child.name == 'div']
+    return [
+        PinchyMixMetadata.from_div(child) for child in rel.children
+        if child.name == 'div'
+    ]
 
 
 def download_file(local_name, url, overwrite=False):
@@ -109,7 +115,7 @@ async def scrape_mix_page_and_download(mix):
     """
     url = os.path.join(BASE_URL, mix.rel)
     resp = requests.get(url)
-    resp.raise_for_status() # handle this later, too
+    resp.raise_for_status()  # handle this later, too
 
     soup = BeautifulSoup(resp.content)
     dl_link = soup.find(id='download').a['href']
@@ -137,7 +143,7 @@ async def scrape_mix_page_and_download(mix):
 
 async def get_pinchy_homepage():
     resp = requests.get(BASE_URL)
-    resp.raise_for_status() # handle this later
+    resp.raise_for_status()  # handle this later
     return resp.content
 
 
@@ -152,12 +158,12 @@ def get_args():
     """
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group()
-    group.add_argument('--list', help='Print all local and remote mixes',
-                       action='store_true')
-    group.add_argument('--download', help='Download mixes only',
-                       action='store_true')
-    group.add_argument('--upload', help='Upload mixes to google play',
-                       action='store_true')
+    group.add_argument(
+        '--list', help='Print all local and remote mixes', action='store_true')
+    group.add_argument(
+        '--download', help='Download mixes only', action='store_true')
+    group.add_argument(
+        '--upload', help='Upload mixes to google play', action='store_true')
     return parser.parse_args()
 
 
@@ -174,8 +180,10 @@ async def main():
     args = get_args()
     mix_ids = get_existing_mix_ids()
     base_content = get_pinchy_homepage()
-    mixes = [mix for mix in get_available_pinchy_info(resp.content) 
-             if mix.mix_id not in mix_ids]
+    mixes = [
+        mix for mix in get_available_pinchy_info(resp.content)
+        if mix.mix_id not in mix_ids
+    ]
     if args.list:
         print(mixes)
         return
