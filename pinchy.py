@@ -44,6 +44,26 @@ class PinchyMixMetadata:
         return PinchyMixMetadata(artist, mix_name, rel, mix_id)
 
 
+def format_mix_info(mixes):
+    """
+    Create a table based on the list of pinchy mixes
+    Pads out the titles based on the widest name in the list
+    """
+    artist_len = max([len(mix.artist) for mix in mixes])
+    title_len = max([len(mix.mix_name) for mix in mixes])
+    separator = f"|{''.ljust(artist_len + title_len + 1, '=')}|"
+    header = [
+        separator,
+        f"|{'artist'.ljust(artist_len)}|{'mix name'.ljust(title_len)}|",
+        separator
+    ]
+    footer = [separator]
+    return '\n'.join(header + [
+        f'|{mix.artist.ljust(artist_len)}|{mix.mix_name.ljust(title_len)}|'
+        for mix in mixes
+    ] + footer)
+
+
 def get_existing_mix_ids():
     """
     get_existing_mix_ids — return a list of pinchy mix ids
@@ -142,6 +162,9 @@ async def scrape_mix_page_and_download(mix):
 
 
 async def get_pinchy_homepage():
+    """
+    ye olde http request
+    """
     resp = requests.get(BASE_URL)
     resp.raise_for_status()  # handle this later
     return resp.content
@@ -179,13 +202,12 @@ async def main():
     """
     args = get_args()
     mix_ids = get_existing_mix_ids()
-    base_content = get_pinchy_homepage()
     mixes = [
-        mix for mix in get_available_pinchy_info(resp.content)
+        mix for mix in get_available_pinchy_info(await get_pinchy_homepage())
         if mix.mix_id not in mix_ids
     ]
     if args.list:
-        print(mixes)
+        print(format_mix_info(mixes))
         return
     if args.download:
         async with trio.open_nursery() as nursery:
