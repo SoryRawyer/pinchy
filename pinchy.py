@@ -2,8 +2,12 @@
 pinchy.py — download mixes from pinchyandfriends.com
 """
 
+import argparse
 import os
+
+import attr
 import requests
+import trio
 
 from bs4 import BeautifulSoup
 
@@ -16,26 +20,26 @@ LOCAL_DIR = os.path.expanduser('~/media/audio/pinchy/')
 
 BASE_URL = 'http://pinchyandfriends.com'
 
-class PinchyMixMetadata(object):
+@attr.s
+class PinchyMixMetadata:
     """
     PinchyMixMetadata : class for storing pinchy mix metadata
     """
-
-    def __init__(self, *args, **kwargs):
-        for kwarg in kwargs:
-            setattr(self, kwarg, kwargs[kwarg])
-
+    mix_name = attr.ib()
+    artist = attr.ib()
+    mix_landing_url = attr.ib()
+    mix_id = attr.ib()
 
     @staticmethod
-    def new(div):
+    def from_div(div):
         """
         new : parse the div and return a new PinchyMixMetadata object
         """
-        mix_name = div['data-name1']
-        artist = div['data-name2']
+        mix_name = div['data-name2']
+        artist = div['data-name1']
         rel = div['onclick'].split('=')[1].strip().replace("'", '').replace(';', '')[1:]
         mix_id = rel.split('/')[0]
-        return PinchyMixMetadata(artist=artist, mix_name=mix_name, mix_id=mix_id, rel=rel)
+        return PinchyMixMetadata(artist, mix_name, rel, mix_id)
 
 
 def get_existing_mix_ids():
@@ -48,7 +52,8 @@ def get_existing_mix_ids():
         return []
 
     mix_dir = lambda x: os.path.join(LOCAL_DIR, x)
-    return set([mix for mix in os.listdir(LOCAL_DIR) if os.path.isdir(mix_dir(mix))])
+    return {mix for mix in os.listdir(LOCAL_DIR)
+            if os.path.isdir(mix_dir(mix))}
 
 
 def get_available_pinchy_info(content):
@@ -59,8 +64,13 @@ def get_available_pinchy_info(content):
 
     all the mixes will be under the div with the id 'grid'
     each div looks like this:
-    <div class="grid_img hand" data-name1="Axe to Grind" data-name2="Lovefingers" data-color="#51AEFF" style="left:0px; top:0px;" onclick="window.location = '/5170/axe-to-grind/';">
-        <img src="/thumbs/440x440/files/zc/lovefingers_97960.jpg" width="150" height="150" class="imgOff" onload="$(this).fadeIn(300);" style="display: inline;">
+    <div class="grid_img hand" data-name1="Axe to Grind"
+    data-name2="Lovefingers" data-color="#51AEFF"
+    style="left:0px; top:0px;"
+    onclick="window.location = '/5170/axe-to-grind/';">
+        <img src="/thumbs/440x440/files/zc/lovefingers_97960.jpg" width="150"
+        height="150" class="imgOff" onload="$(this).fadeIn(300);"
+        style="display: inline;">
     </div>
 
     data-name1 = mix name
@@ -69,7 +79,8 @@ def get_available_pinchy_info(content):
     """
     page = BeautifulSoup(content, features='html.parser')
     rel = page.find(id='grid_rel')
-    return [PinchyMixMetadata.new(child) for child in rel.children if child.name == 'div']
+    return [PinchyMixMetadata.from_div(child) 
+            for child in rel.children if child.name == 'div']
 
 
 def download_file(local_name, url, overwrite=False):
@@ -86,10 +97,9 @@ def download_file(local_name, url, overwrite=False):
         for chunk in resp.iter_content(chunk_size=1024):
             if chunk:
                 output.write(chunk)
-    return
 
 
-def scrape_mix_page_and_download(mix):
+async def scrape_mix_page_and_download(mix):
     """
     scrape_mix_page_and_download
 
@@ -125,21 +135,55 @@ def scrape_mix_page_and_download(mix):
     return
 
 
-def main():
+async def get_pinchy_homepage():
+    resp = requests.get(BASE_URL)
+    resp.raise_for_status() # handle this later
+    return resp.content
+
+
+def get_args():
+    """
+    get_args:
+    - parse command-line arguments
+    list: show which mixes you have locally and also mixes that at one the site
+    download: save the mixes locally
+    publish: push the mixes somewhere (maybe add a value that indicates
+    where to publish?? like gcp or aws or dropbox or whatever?)
+    """
+    parser = argparse.ArgumentParser()
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--list', help='Print all local and remote mixes',
+                       action='store_true')
+    group.add_argument('--download', help='Download mixes only',
+                       action='store_true')
+    group.add_argument('--upload', help='Upload mixes to google play',
+                       action='store_true')
+    return parser.parse_args()
+
+
+async def main():
     """
     main :
     - bootstrap (get a list of all downloaded mixes)
     - scrape pinchyandfriends.com and look for IDs that aren't found locally
-    - download 'em and exit
+    - if list: print downloaded mixes + mixes available on the site
+    - if download: just download any remote mixes and exit
+    - if upload: download any remote mixes not found locally/in google play
         - if present, save the tracklist
     """
+    args = get_args()
     mix_ids = get_existing_mix_ids()
-    resp = requests.get(BASE_URL)
-    resp.raise_for_status() # handle this later
-    mixes = [mix for mix in get_available_pinchy_info(resp.content) if mix.mix_id not in mix_ids]
-    for mix in mixes:
-        scrape_mix_page_and_download(mix)
+    base_content = get_pinchy_homepage()
+    mixes = [mix for mix in get_available_pinchy_info(resp.content) 
+             if mix.mix_id not in mix_ids]
+    if args.list:
+        print(mixes)
+        return
+    if args.download:
+        async with trio.open_nursery() as nursery:
+            for mix in mixes:
+                nursery.start_soon(scrape_mix_page_and_download, mix)
 
 
 if __name__ == '__main__':
-    main()
+    trio.run(main)
