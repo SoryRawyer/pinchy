@@ -1,5 +1,5 @@
 """
-pinchy.py — download mixes from pinchyandfriends.com
+pinchy.py - download mixes from pinchyandfriends.com
 """
 
 import argparse
@@ -133,7 +133,7 @@ async def scrape_mix_page_and_download(mix):
     create directory for mix
     download mix and photo and tracklist
     """
-    url = os.path.join(BASE_URL, mix.rel)
+    url = os.path.join(BASE_URL, mix.mix_landing_url)
     resp = requests.get(url)
     resp.raise_for_status()  # handle this later, too
 
