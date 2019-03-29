@@ -3,11 +3,13 @@ pinchy.py - download mixes from pinchyandfriends.com
 """
 
 import argparse
+import logging
 import os
+
+from concurrent.futures import ThreadPoolExecutor
 
 import attr
 import requests
-import trio
 
 from bs4 import BeautifulSoup
 
@@ -20,6 +22,7 @@ LOCAL_DIR = os.path.expanduser('~/media/audio/pinchy/')
 
 BASE_URL = 'http://pinchyandfriends.com'
 
+log = logging.getLogger("pinchy")
 
 @attr.s
 class PinchyMixMetadata:
@@ -125,7 +128,7 @@ def download_file(local_name, url, overwrite=False):
                 output.write(chunk)
 
 
-async def scrape_mix_page_and_download(mix):
+def scrape_mix_page_and_download(mix: PinchyMixMetadata):
     """
     scrape_mix_page_and_download
 
@@ -133,6 +136,7 @@ async def scrape_mix_page_and_download(mix):
     create directory for mix
     download mix and photo and tracklist
     """
+    log.info("downloading {}".format(mix.mix_name))
     url = os.path.join(BASE_URL, mix.mix_landing_url)
     resp = requests.get(url)
     resp.raise_for_status()  # handle this later, too
@@ -161,7 +165,7 @@ async def scrape_mix_page_and_download(mix):
     return
 
 
-async def get_pinchy_homepage():
+def get_pinchy_homepage():
     """
     ye olde http request
     """
@@ -190,7 +194,7 @@ def get_args():
     return parser.parse_args()
 
 
-async def main():
+def main():
     """
     main :
     - bootstrap (get a list of all downloaded mixes)
@@ -203,17 +207,17 @@ async def main():
     args = get_args()
     mix_ids = get_existing_mix_ids()
     mixes = [
-        mix for mix in get_available_pinchy_info(await get_pinchy_homepage())
+        mix for mix in get_available_pinchy_info(get_pinchy_homepage())
         if mix.mix_id not in mix_ids
     ]
     if args.list:
         print(format_mix_info(mixes))
         return
     if args.download:
-        async with trio.open_nursery() as nursery:
+        with ThreadPoolExecutor(max_workers=4) as executor:
             for mix in mixes:
-                nursery.start_soon(scrape_mix_page_and_download, mix)
+                executor.submit(scrape_mix_page_and_download, mix)
 
 
 if __name__ == '__main__':
-    trio.run(main)
+    main()
